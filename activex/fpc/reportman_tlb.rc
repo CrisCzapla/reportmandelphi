@@ -1,0 +1,3 @@
+// The type library, read by ComServer (LoadTypeLib of the module) to
+// register the server and to implement IDispatch
+1 TYPELIB "../reportman.tlb"

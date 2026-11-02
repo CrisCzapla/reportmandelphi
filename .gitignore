@@ -326,3 +326,7 @@ build/getit/out/
 repman/utils/printrep/lcl/lib/
 repman/utils/printrep/lcl/backup/
 install/bin/
+install/Output/
+install/deps/
+activex/fpc/lib/
+activex/fpc/backup/
