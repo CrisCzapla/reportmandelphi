@@ -322,6 +322,7 @@ build/macos/package-build.log
 
 # GetIt package zip (build/getit/make-getit.ps1)
 build/getit/out/
+
 # Lazarus builds of the utilities and the binaries the installers take
 repman/utils/printrep/lcl/lib/
 repman/utils/printrep/lcl/backup/
