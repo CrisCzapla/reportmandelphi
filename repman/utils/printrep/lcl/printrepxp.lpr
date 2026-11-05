@@ -157,6 +157,16 @@ begin
     if ParamStr(indexparam)='-stdin' then
      isstdin:=true
     else
+    // The window of the calling application: the preview opens on its
+    // monitor
+    if ParamStr(indexparam)='-owner' then
+    begin
+     inc(indexparam);
+     if indexparam>=Paramcount+1 then
+      Raise Exception.Create(SRpNumberexpected);
+     RpPreviewOwnerWindow:=THandle(StrToInt64(ParamStr(indexparam)));
+    end
+    else
     if ParamStr(indexparam)='-from' then
     begin
      inc(indexparam);

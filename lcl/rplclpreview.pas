@@ -164,6 +164,11 @@ type
 function ShowPreview(previewcontrol:TRpPreviewMeta;
  caption:string):boolean;
 
+var
+ // The window of the application that shows the preview (printrepxp -owner):
+ // the preview opens on its monitor (Windows). 0: none
+ RpPreviewOwnerWindow:THandle=0;
+
 implementation
 
 uses rprflclparams, rppdfdriver
@@ -433,6 +438,43 @@ begin
  Fpreviewcontrol.Align:=alClient;
 end;
 
+{$IFDEF MSWINDOWS}
+// RpPreviewOwnerWindow: centered on the work area of the monitor of that
+// window (maximized on it when the report asks for it). The preview is not
+// made an owned window of it: the LCL hides the visible owners of the windows
+// of the application when the modal preview is minimized (HidePopups), so a
+// window of another process would be hidden too
+procedure PlaceOnOwnerWindow(AForm:TCustomForm);
+var
+ mon:TMonitor;
+ work:TRect;
+ w,h:integer;
+ maximized:boolean;
+begin
+ if (RpPreviewOwnerWindow=0) or (not IsWindow(RpPreviewOwnerWindow)) then
+  exit;
+ mon:=Screen.MonitorFromWindow(RpPreviewOwnerWindow,mdNearest);
+ if Assigned(mon) then
+ begin
+  work:=mon.WorkareaRect;
+  maximized:=AForm.WindowState=wsMaximized;
+  if maximized then
+   AForm.WindowState:=wsNormal;
+  w:=AForm.Width;
+  h:=AForm.Height;
+  if w>work.Right-work.Left then
+   w:=work.Right-work.Left;
+  if h>work.Bottom-work.Top then
+   h:=work.Bottom-work.Top;
+  AForm.Position:=poDesigned;
+  AForm.SetBounds(work.Left+(work.Right-work.Left-w) div 2,
+   work.Top+(work.Bottom-work.Top-h) div 2,w,h);
+  if maximized then
+   AForm.WindowState:=wsMaximized;
+ end;
+end;
+{$ENDIF}
+
 function ShowPreview(previewcontrol:TRpPreviewMeta;
  caption:string):boolean;
 var
@@ -459,6 +501,9 @@ begin
    dia.Width:=Screen.WorkAreaWidth;
   if dia.Height>Screen.WorkAreaHeight then
    dia.Height:=Screen.WorkAreaHeight;
+{$IFDEF MSWINDOWS}
+  PlaceOnOwnerWindow(dia);
+{$ENDIF}
   previewcontrol.OnWorkProgress:=dia.RepProgress;
   Application.OnIdle:=dia.AppIdle;
   dia.ShowModal;
