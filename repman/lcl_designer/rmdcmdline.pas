@@ -88,6 +88,9 @@ procedure ApplyCommandLineOptions;
 // --owner <window handle>: the window of the application that calls the
 // designer (0 if none). The designer opens on its monitor and stays above it.
 function CommandLineOwner: PtrUInt;
+// The value of an option followed by a value (--libconfig file...), '' if
+// the option is not in the command line
+function CommandLineValue(const AOption: string): string;
 // The lclstrconsts .po file for the user language, '' if there is none
 function LCLTranslationFile: string;
 // Translates the LCL resourcestrings (call it before Application.Initialize)
@@ -244,7 +247,8 @@ end;
 function IsValueOption(const P: string): Boolean;
 begin
   Result := SameText(P, '-dbxconnectionfile') or SameText(P, '--dbxconnectionfile') or
-    SameText(P, '--connection') or SameText(P, '--owner');
+    SameText(P, '--connection') or SameText(P, '--owner') or
+    SameText(P, '--libconfig') or SameText(P, '--library') or SameText(P, '--report');
 end;
 
 function CommandLineFile: string;
@@ -298,14 +302,19 @@ begin
   end;
 end;
 
-function CommandLineOwner: PtrUInt;
+function CommandLineValue(const AOption: string): string;
 var
   i: Integer;
 begin
-  Result := 0;
+  Result := '';
   for i := 1 to ParamCount - 1 do
-    if SameText(ParamStr(i), '--owner') then
-      Result := PtrUInt(StrToInt64Def(ParamStr(i + 1), 0));
+    if SameText(ParamStr(i), AOption) then
+      Result := ParamStr(i + 1);
+end;
+
+function CommandLineOwner: PtrUInt;
+begin
+  Result := PtrUInt(StrToInt64Def(CommandLineValue('--owner'), 0));
 end;
 
 function LCLTranslationFile: string;
@@ -382,7 +391,8 @@ begin
   WriteStd(APP_NAME + ' ' + RM_VERSION, False);
   WriteStd('Usage: ' + ExtractFileName(ParamStr(0)) +
     ' [--help] [--version] [--check-https [url]] [-dbxconnectionfile file]' +
-    ' [--connection ALIAS=string]... [--owner handle] [report.rep]', False);
+    ' [--connection ALIAS=string]... [--owner handle] [--libconfig file]' +
+    ' [--library ALIAS --report NAME | report.rep]', False);
   WriteStd('', False);
   WriteStd('  report.rep     report file to open (path or file:// URI)', False);
   WriteStd('  --version      print the version and the data folders, then exit', False);
@@ -397,6 +407,11 @@ begin
   WriteStd('                 designing; the report keeps its own (repeatable)', False);
   WriteStd('  --owner handle the window of the calling application: the designer', False);
   WriteStd('                 opens on its monitor and stays above it (Windows)', False);
+  WriteStd('  --libconfig file', False);
+  WriteStd('                 the report library connections from that file instead', False);
+  WriteStd('                 of the repmandlib configuration of the user', False);
+  WriteStd('  --library ALIAS --report NAME', False);
+  WriteStd('                 opens the report NAME of the library connection ALIAS', False);
   WriteStd('  --help        print this help, then exit', False);
 end;
 

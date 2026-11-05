@@ -312,6 +312,23 @@ begin
   end;
 end;
 
+// --library ALIAS --report NAME: a report of the library connections
+// (--libconfig, or the repmandlib configuration of the user)
+procedure OpenLibraryFromCommandLine(AForm: TFRpMainFLCL; const ALibrary,
+  AReportName: string);
+begin
+  try
+    AForm.OpenReportFromLibrary(ALibrary, WideString(AReportName));
+  except
+    on E: Exception do
+    begin
+      WriteStd('ERROR: cannot open ' + ALibrary + '->' + AReportName + ': ' + E.Message, True);
+      MessageDlg(Application.Title, ALibrary + '->' + AReportName + LineEnding +
+        LineEnding + E.Message, mtError, [mbOK], 0);
+    end;
+  end;
+end;
+
 {$IFDEF DARWIN}
 procedure TFinderOpener.OpenFiles(Sender: TObject; const FileNames: array of string);
 var
@@ -332,6 +349,9 @@ end;
 begin
   FileArg := CommandLineFile;
   ApplyCommandLineOptions;
+  // --libconfig: the library connections of the calling application
+  if CommandLineValue('--libconfig') <> '' then
+    RpDesignerLCLLibConfigFile := ExpandFileName(CommandLineValue('--libconfig'));
   // LCL texts (dialog buttons...) in the language of reportmanres.*
   TranslateLCL;
   // A sample saved in another folder finds its data in the samples
@@ -353,6 +373,9 @@ begin
     // The local schema of the sample reports for the copilot, on a computer
     // that does not have it yet (rpsamplesutil)
     RpInstallSamplesSchema(RpInstalledSamplesFolder);
+    if (CommandLineValue('--library') <> '') and (CommandLineValue('--report') <> '') then
+      OpenLibraryFromCommandLine(MainForm, CommandLineValue('--library'), CommandLineValue('--report'))
+    else
     if FileArg <> '' then
       OpenFromCommandLine(MainForm, FileArg)
     else
