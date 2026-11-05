@@ -81,7 +81,13 @@ function CommandLineFile: string;
 // -dbxconnectionfile <file>: the connections (and the local schemas next to
 // them) from that file instead of the shared dbxconnections.ini, as
 // printreptopdf and the server allow. Call it before opening any report.
+// --connection ALIAS=string (repeatable): the ADO connection string of that
+// connection alias, used when it opens but not saved in the report
+// (rpdatainfo ADOConnectionOverrides).
 procedure ApplyCommandLineOptions;
+// --owner <window handle>: the window of the application that calls the
+// designer (0 if none). The designer opens on its monitor and stays above it.
+function CommandLineOwner: PtrUInt;
 // The lclstrconsts .po file for the user language, '' if there is none
 function LCLTranslationFile: string;
 // Translates the LCL resourcestrings (call it before Application.Initialize)
@@ -234,6 +240,13 @@ begin
   {$ENDIF}
 end;
 
+// The options followed by a value
+function IsValueOption(const P: string): Boolean;
+begin
+  Result := SameText(P, '-dbxconnectionfile') or SameText(P, '--dbxconnectionfile') or
+    SameText(P, '--connection') or SameText(P, '--owner');
+end;
+
 function CommandLineFile: string;
 var
   i: Integer;
@@ -244,8 +257,8 @@ begin
   while i <= ParamCount do
   begin
     p := ParamStr(i);
-    // The value of -dbxconnectionfile is not the report
-    if SameText(p, '-dbxconnectionfile') or SameText(p, '--dbxconnectionfile') then
+    // The value of an option is not the report
+    if IsValueOption(p) then
     begin
       Inc(i, 2);
       Continue;
@@ -263,10 +276,36 @@ end;
 procedure ApplyCommandLineOptions;
 var
   i: Integer;
+  p: string;
 begin
   for i := 1 to ParamCount - 1 do
+  begin
     if SameText(ParamStr(i), '-dbxconnectionfile') or SameText(ParamStr(i), '--dbxconnectionfile') then
       DBXConnectionsFileOverride := ParamStr(i + 1);
+    if SameText(ParamStr(i), '--connection') then
+    begin
+      // ALIAS=string: the string has '=' of its own, the alias does not
+      p := ParamStr(i + 1);
+      if Pos('=', p) < 2 then
+      begin
+        WriteStd('WARNING: --connection ' + p + ' ignored (ALIAS=string expected)', True);
+        Continue;
+      end;
+      if not Assigned(ADOConnectionOverrides) then
+        ADOConnectionOverrides := TStringList.Create;
+      ADOConnectionOverrides.Add(p);
+    end;
+  end;
+end;
+
+function CommandLineOwner: PtrUInt;
+var
+  i: Integer;
+begin
+  Result := 0;
+  for i := 1 to ParamCount - 1 do
+    if SameText(ParamStr(i), '--owner') then
+      Result := PtrUInt(StrToInt64Def(ParamStr(i + 1), 0));
 end;
 
 function LCLTranslationFile: string;
@@ -342,7 +381,8 @@ procedure ShowUsage;
 begin
   WriteStd(APP_NAME + ' ' + RM_VERSION, False);
   WriteStd('Usage: ' + ExtractFileName(ParamStr(0)) +
-    ' [--help] [--version] [--check-https [url]] [-dbxconnectionfile file] [report.rep]', False);
+    ' [--help] [--version] [--check-https [url]] [-dbxconnectionfile file]' +
+    ' [--connection ALIAS=string]... [--owner handle] [report.rep]', False);
   WriteStd('', False);
   WriteStd('  report.rep     report file to open (path or file:// URI)', False);
   WriteStd('  --version      print the version and the data folders, then exit', False);
@@ -352,7 +392,12 @@ begin
   WriteStd('  -dbxconnectionfile file', False);
   WriteStd('                 the connections (and the local schemas next to them)', False);
   WriteStd('                 from that file instead of the shared dbxconnections.ini', False);
-  WriteStd('  --help         print this help, then exit', False);
+  WriteStd('  --connection ALIAS=string', False);
+  WriteStd('                 ADO connection string of the connection ALIAS while', False);
+  WriteStd('                 designing; the report keeps its own (repeatable)', False);
+  WriteStd('  --owner handle the window of the calling application: the designer', False);
+  WriteStd('                 opens on its monitor and stays above it (Windows)', False);
+  WriteStd('  --help        print this help, then exit', False);
 end;
 
 { --check-https: the TLS connection of the login, the AI assistants and the
@@ -487,4 +532,6 @@ end;
 
 initialization
   HandleEarlyOptions;
+finalization
+  FreeAndNil(ADOConnectionOverrides);
 end.

@@ -32,6 +32,9 @@ uses
   cthreads, cwstring,
   {$ENDIF}
   rmdcmdline,
+  {$IFDEF MSWINDOWS}
+  Windows,
+  {$ENDIF}
   SysUtils, Classes, IniFiles, Interfaces, Forms, Controls, Dialogs,
   rpmdconsts, rpdatainfo, rpsamplesutil, rpmdfmainlcl;
 
@@ -238,6 +241,49 @@ begin
   end;
 end;
 
+{$IFDEF MSWINDOWS}
+{ --owner: the window of the application that calls the designer. The
+  designer opens on the monitor of that window (the saved size kept, centered
+  in its work area when the saved position is on another monitor) and is
+  owned by it: always above it and minimized with it, as a dialog of the
+  calling application. }
+procedure ApplyOwnerWindow(AForm: TFRpMainFLCL; AOwner: HWND);
+var
+  mon: TMonitor;
+  work, r: TRect;
+  w, h: Integer;
+  maximized: Boolean;
+begin
+  if (AOwner = 0) or not IsWindow(AOwner) then
+    Exit;
+  mon := Screen.MonitorFromWindow(AOwner, mdNearest);
+  if Assigned(mon) then
+  begin
+    work := mon.WorkareaRect;
+    // Placed in the normal state: maximized again on that monitor
+    maximized := AForm.WindowState = wsMaximized;
+    if maximized then
+      AForm.WindowState := wsNormal;
+    r := AForm.BoundsRect;
+    if Screen.MonitorFromRect(r, mdNearest) <> mon then
+    begin
+      w := r.Right - r.Left;
+      h := r.Bottom - r.Top;
+      if w > work.Right - work.Left then
+        w := work.Right - work.Left;
+      if h > work.Bottom - work.Top then
+        h := work.Bottom - work.Top;
+      AForm.Position := poDesigned;
+      AForm.SetBounds(work.Left + (work.Right - work.Left - w) div 2,
+        work.Top + (work.Bottom - work.Top - h) div 2, w, h);
+    end;
+    if maximized then
+      AForm.WindowState := wsMaximized;
+  end;
+  SetWindowLongPtr(AForm.Handle, GWL_HWNDPARENT, LONG_PTR(AOwner));
+end;
+{$ENDIF}
+
 procedure OpenFromCommandLine(AForm: TFRpMainFLCL; const AFile: string);
 var
   fname: string;
@@ -301,6 +347,9 @@ begin
     Application.OnException := ExceptionLogger.AppException;
     Application.CreateForm(TFRpMainFLCL, MainForm);
     LoadPreferences(MainForm);
+    {$IFDEF MSWINDOWS}
+    ApplyOwnerWindow(MainForm, HWND(CommandLineOwner));
+    {$ENDIF}
     // The local schema of the sample reports for the copilot, on a computer
     // that does not have it yet (rpsamplesutil)
     RpInstallSamplesSchema(RpInstalledSamplesFolder);

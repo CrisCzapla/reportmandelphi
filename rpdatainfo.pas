@@ -216,6 +216,13 @@ var
  // command line (-dbxconnectionfile). The instance-level DBXConnectionsOverride
  // takes precedence when assigned.
  DBXConnectionsFileOverride:string='';
+ // Process-wide ADO connection strings by connection alias (ALIAS=value),
+ // settable from the command line of the designer (--connection): an
+ // application that calls the designer gives its own connection without
+ // writing it in the report. They are used when the connection opens, so
+ // saving the report keeps the stored ADOConnectionString. Owned by the code
+ // that creates it; nil when there are none.
+ ADOConnectionOverrides:TStringList=nil;
 {$IFDEF FPC}
  // Folder of the report open in the designer: a MyBase file that is not found
  // (a relative name, a connection without DATABASE) is looked for there. The
@@ -619,6 +626,10 @@ function EncodeADOPassword(astring:String):String;
 // The connection string edited over the one of EncodeADOPassword: a masked
 // password (only '*') is the one of the original string
 function RestoreADOPassword(const AEdited,AOriginal:String):String;
+// The ADO connection string to open AAlias with: its ADOConnectionOverrides
+// entry when there is one, else ADefault (the one stored in the report)
+function RpADOConnectionString(const AAlias:string;
+  const ADefault:WideString):WideString;
 {$IFDEF USEADOZEOS}
 // FPC on Windows opens the ADO connections with the OleDB protocol of Zeos:
 // the OLE DB initialization string of an ADO connection string (a .udl of
@@ -2883,7 +2894,7 @@ begin
       if Not Assigned(FProvidedADOCOnnection) then
       begin
        ADOConnection.Mode:=cmRead;
-          ADOConnection.ConnectionString:=ADOConnectionString;
+          ADOConnection.ConnectionString:=RpADOConnectionString(Alias,ADOConnectionString);
        if (TRpDatabaseInfoList(Collection).FReport is TRpBaseReport) then
        begin
         report:=TRpDatabaseInfoList(Collection).FReport As TRpbASEReport;
@@ -2907,7 +2918,7 @@ begin
       end;
       if FZConnection.Connected then
        exit;
-      adoconnstr:=ADOConnectionString;
+      adoconnstr:=RpADOConnectionString(Alias,ADOConnectionString);
       if (TRpDatabaseInfoList(Collection).FReport is TRpBaseReport) then
       begin
        report:=TRpDatabaseInfoList(Collection).FReport As TRpBaseReport;
@@ -6789,6 +6800,20 @@ begin
   exit;
  Result:=Copy(AEdited,1,editstart-1)+Copy(AOriginal,origstart,origlength)+
   Copy(AEdited,editstart+editlength,Length(AEdited));
+end;
+
+function RpADOConnectionString(const AAlias:string;
+  const ADefault:WideString):WideString;
+var
+ index:integer;
+begin
+ Result:=ADefault;
+ if not Assigned(ADOConnectionOverrides) then
+  exit;
+ // Not case sensitive, as the aliases of the report
+ index:=ADOConnectionOverrides.IndexOfName(AAlias);
+ if index>=0 then
+  Result:=ADOConnectionOverrides.ValueFromIndex[index];
 end;
 
 {$IFDEF USEADOZEOS}
