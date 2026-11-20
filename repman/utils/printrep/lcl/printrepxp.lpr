@@ -59,6 +59,10 @@ var
  pdialog:boolean;
  compress,doprint:boolean;
 
+const
+ // Not in the translated resources (yet): a tool switch, English only
+ SRpPrintRepToXML='         -toxml     Convert the report to XML format (the format of the .net engine), no execution';
+
 procedure PrintHelp;
 begin
  Writeln(SRpPrintRep1+' XP '+RM_VERSION);
@@ -81,6 +85,7 @@ begin
  Writeln(SRpPrintRep24);
  Writeln(SRpPrintRep25);
  Writeln(SRpPrintRep29);
+ Writeln(SRpPrintRepToXML);
  Writeln(SRpParseParamsH);
  Writeln(SRpCommandLineStdIN);
 end;
@@ -88,7 +93,7 @@ end;
 var
  isstdin:Boolean;
  memstream:TMemoryStream;
- topdf,tobmp,monobmp,tometafile,showparams:Boolean;
+ topdf,tobmp,monobmp,tometafile,showparams,toxml:Boolean;
  bmpresx,bmpresy:integer;
  meta:TrpMetafileReport;
  abitmap:TBitmap;
@@ -106,6 +111,7 @@ begin
  monobmp:=true;
  topdf:=false;
  tometafile:=false;
+ toxml:=false;
  outputfilename:='';
 {$IFDEF MSWINDOWS}
  // ADO connections (Zeos OleDB) need COM in this thread
@@ -196,6 +202,13 @@ begin
      tometafile:=true;
     end
     else
+    // Converts the report (any format: text, binary, zlib) to XML, the
+    // format read by the .net engine; the report is not executed
+    if ParamStr(indexparam)='-toxml' then
+    begin
+     toxml:=true;
+    end
+    else
      if ParamStr(indexparam)='-to' then
      begin
       inc(indexparam);
@@ -270,7 +283,7 @@ begin
       else
       begin
        filename:=ParamStr(indexparam);
-       if ((not topdf) and (not tometafile) and (not tobmp)) then
+       if ((not topdf) and (not tometafile) and (not tobmp) and (not toxml)) then
        begin
         inc(indexparam);
         break;
@@ -332,6 +345,23 @@ begin
      end
      else
       report.LoadFromFile(filename);
+     if toxml then
+     begin
+      // Without executing: no parameters, no connections
+      report.StreamFormat:=rpStreamXML;
+      memstream:=TMemoryStream.Create;
+      try
+       report.SaveToStream(memstream);
+       memstream.Seek(0,soFromBeginning);
+       if Length(outputfilename)>0 then
+        memstream.SaveToFile(outputfilename)
+       else
+        WriteStreamToStdOutput(memstream);
+      finally
+       memstream.Free;
+      end;
+      exit;
+     end;
      if acopies=0 then
       copies:=report.Copies
      else
