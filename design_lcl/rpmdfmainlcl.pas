@@ -2661,6 +2661,8 @@ begin
     subrep.AddPageHeader;
     subrep.AddDetail;
     subrep.AddPageFooter;
+    // Saved as XML, as a new report of TRpBaseReport.CreateNew
+    newRep.StreamFormat := rpStreamXML;
   except
     newRep.Free;
     raise;

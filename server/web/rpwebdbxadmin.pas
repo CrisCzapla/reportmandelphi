@@ -1158,7 +1158,7 @@ begin
   LConnAdmin := CreateConnAdmin;
   try
     LConnAdmin.AddConnection(Trim(AConnectionName), LEffectiveDriverName);
-    LConnAdmin.config.UpdateFile;
+    LConnAdmin.SaveConfig;
   finally
     LConnAdmin.Free;
   end;
@@ -1212,6 +1212,21 @@ begin
     if LCurrentParams.Count = 0 then
       raise Exception.Create('Connection not found: ' + AConnectionName);
 
+    // A connection shared with .NET (DriverName=ADO.NET): only its Delphi
+    // parameters (its Delphi.* keys) change, the driver chosen included
+    if LConnAdmin.IsDotNetConnection(AConnectionName) then
+    begin
+      LAllowedParams.Assign(AValues);
+      I := LAllowedParams.IndexOfName(RP_WEB_DBX_DRIVER_PARAM);
+      if I >= 0 then
+        LAllowedParams.Delete(I);
+      LAllowedParams.Values['DriverName'] := ResolveEffectiveDriverName(AValues,
+        Trim(LCurrentParams.Values['DriverName']));
+      LConnAdmin.UpdateDotNetDelphiParams(AConnectionName, LAllowedParams);
+      ReloadAfterWrite;
+      Exit;
+    end;
+
     LOriginalDriverName := Trim(LCurrentParams.Values['DriverName']);
     LDriverFamily := Trim(AValues.Values['DriverName']);
     if Length(LDriverFamily) = 0 then
@@ -1249,7 +1264,7 @@ begin
       LConnAdmin.config.WriteString(AConnectionName, LName,
         AValues.ValueFromIndex[I]);
     end;
-    LConnAdmin.config.UpdateFile;
+    LConnAdmin.SaveConfig;
   finally
     LAllowedParams.Free;
     LSeedValues.Free;
@@ -1267,7 +1282,7 @@ begin
   LConnAdmin := CreateConnAdmin;
   try
     LConnAdmin.DeleteConnection(AConnectionName);
-    LConnAdmin.config.UpdateFile;
+    LConnAdmin.SaveConfig;
   finally
     LConnAdmin.Free;
   end;

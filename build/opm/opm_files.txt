@@ -54,6 +54,7 @@ rpdatainfo.pas
 rpdatamatrix.pas
 rpdataset.pas
 rpdatatext.pas
+rpdbxdotnet.pas
 rpDelphiZXIngQRCode.pas
 rpdesignerclientsql.pas
 rpdirectwrite.pas

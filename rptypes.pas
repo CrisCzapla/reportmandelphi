@@ -4197,9 +4197,9 @@ end;
 function ReadStreamFromHandle(handle:THandle):TMemoryStream;
 var
  memstream:TMemoryStream;
- astring:String;
- buffer:array [0..3] of char;
- pbuf:Pchar;
+ // The bytes as they come: a Char buffer and a String made them two bytes each in Unicode
+ // Delphi, so the stream got half the data mixed with zeros
+ buffer:array [0..65535] of Byte;
  finish:boolean;
 {$IFDEF MSWINDOWS}
  readed:DWORD;
@@ -4210,49 +4210,34 @@ var
 begin
  memstream:=TMemoryStream.Create;
  try
-  pbuf:=@buffer;
-  astring:='';
   finish:=false;
-  buffer[1]:=chr(0);
   repeat
-
 {$IFDEF MSWINDOWS}
-   if not ReadFile(handle,pbuf^,1,readed,nil) then
+   if not ReadFile(handle,buffer[0],SizeOf(buffer),readed,nil) then
    begin
     lasterror:=GetLastError;
     if ((lasterror<>ERROR_HANDLE_EOF) AND (lasterror<>ERROR_BROKEN_PIPE)) then
-    begin
      RaiseLastOSError;
-    end
-    else
-    begin
-     finish:=true;
-     readed:=0;
-    end;
+    readed:=0;
    end;
+   // A pipe ends with ERROR_BROKEN_PIPE, a redirected file reads no bytes at its end
+   if readed=0 then
+    finish:=true;
 {$ELSE}
    // In linux the handle 0 is the stdinput
+   // FileRead returns bytes read, 0 at EOF and -1 on error
 {$IFDEF FPC}
-        readed:=FileRead(0,pbuf^,1);
-        if readed=0 then
-         finish:=true;
+   readed:=FileRead(0,buffer[0],SizeOf(buffer));
 {$ELSE}
-        // FileRead returns bytes read, 0 at EOF and -1 on error
-        readed:=SysUtils.FileRead(handle,pbuf^,1);
-        if readed<=0 then
-         finish:=true;
+   readed:=SysUtils.FileRead(handle,buffer[0],SizeOf(buffer));
 {$ENDIF}
+   if readed<=0 then
+    finish:=true;
 {$ENDIF}
    if readed>0 then
-   begin
-    astring:=astring+pbuf[0];
-   end;
+    memstream.Write(buffer[0],readed);
   until finish;
-  if Length(astring)>0 then
-  begin
-   memstream.Write(astring[1],Length(astring));
-   memstream.Seek(0,soFromBeginning);
-  end;
+  memstream.Seek(0,soFromBeginning);
   Result:=memstream;
  except
   memstream.free;
@@ -5110,10 +5095,17 @@ end;
 // Rounding a number with not balanced system
 // always the upper value if in the middle
 function Roundfloat(num:double;redondeo:double):double;
+const
+ // The limits of the Currency arithmetic below (a Currency holds up to
+ // 922337203685477.5807): the largest Double that converts to a Currency,
+ // and the largest Currency that can still be multiplied by 10. Both are
+ // exact as a Double, so every compiler reads the same limit
+ MAXROUNDNUM=922337203685477.5;
+ MAXROUNDSCALE:Currency=92233720368547.75;
 var
  provanum,provaredon,quocient:currency;
  intnum,intredon:Comp;
- reste:integer;
+ reste:Int64;
  signenum,escala:integer;
 begin
  if ((redondeo=0) or (num=0)) then
@@ -5124,6 +5116,14 @@ begin
  if redondeo<0.0001 then
  begin
   redondeo:=0.0001;
+ end;
+ // A number or a multiple that does not fit a Currency (or is not a number)
+ // is returned as it is: the conversion overflowed, and the loops below
+ // never ended
+ if not ((abs(num)<=MAXROUNDNUM) and (abs(redondeo)<=MAXROUNDNUM)) then
+ begin
+  result:=num;
+  exit;
  end;
 
  // Original number
@@ -5136,12 +5136,23 @@ begin
  escala:=1;
  While (frac(provanum)<>0) do
  begin
+  // The same when the scaled number or multiple would not fit
+  if (provanum>MAXROUNDSCALE) or (provaredon>MAXROUNDSCALE) then
+  begin
+   result:=num;
+   exit;
+  end;
   provanum:=provanum*10;
   provaredon:=provaredon*10;
   escala:=escala*10;
  end;
  While (frac(provaredon)<>0) do
  begin
+  if (provanum>MAXROUNDSCALE) or (provaredon>MAXROUNDSCALE) then
+  begin
+   result:=num;
+   exit;
+  end;
   provanum:=provanum*10;
   provaredon:=provaredon*10;
   escala:=escala*10;

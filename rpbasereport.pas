@@ -1004,6 +1004,10 @@ begin
  // Creates a new default report
  FreeSubreports;
  AddSubReport;
+ // A new report is saved as XML, the format every engine reads (the .NET
+ // and TypeScript ones read only XML); a report that is loaded keeps the
+ // format it was saved in, and the format can be changed in the page setup
+ FStreamFormat:=rpStreamXML;
 end;
 
 procedure TRpBaseReport.SaveToFile(Filename:string);
@@ -1842,7 +1846,9 @@ begin
   barcode.Rotation:=Round(Rotation*10);
   barcode.Checksum:=CalcChecksum;
   FValue:=Evaluator.EvaluateText(Expression);
-  barcode.CurrentText:=AnsiString(FormatVariant(displayformat,FValue,rpParamUnknown,true));
+  // The WideString keeps the FNC1 mark (U+00BF) as one character on Linux too
+  barcode.CurrentTextW:=FormatVariant(displayformat,FValue,rpParamUnknown,true);
+  barcode.CurrentText:=AnsiString(barcode.CurrentTextW);
   try
    data:=String(barcode.Calculatebarcode);
   except

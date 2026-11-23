@@ -1007,19 +1007,48 @@ end;
 
 {**************************************************************************}
 
-function TIdenInt.GeTRpValue:TRpValue;
+// The integer part of a number for INT: an Integer when it fits in 32 bits,
+// as it always was; an Int64 beyond (it was cut to its low 32 bits), and the
+// number without its fraction, still a Double, when not even an Int64 holds it
+function TruncNumber(const avalue:Double):Variant;
+var
+ aint:Double;
 begin
- if (not (VarType(Params[0]) in [varSmallInt..varDate,varVariant])) then
+ aint:=Int(avalue);
+ if (aint>=-2147483648.0) and (aint<=2147483647.0) then
+  Result:=Integer(Trunc(aint))
+ else
+  if (aint>=-9223372036854775808.0) and (aint<9223372036854775808.0) then
+   Result:=Trunc(aint)
+  else
+   Result:=aint;
+end;
+
+function TIdenInt.GeTRpValue:TRpValue;
+var
+ aint64:Int64;
+begin
+ if (not (VarType(Params[0]) in [varSmallInt..varDate,varVariant,varInt64])) then
    Raise TRpNamedException.Create(SRpEvalType,
          IdenName);
  case Vartype(Params[0]) of
   varSmallInt..varDate:
    begin
-    Result:=Integer(Trunc(Int(Double(Params[0]))));
+    Result:=TruncNumber(Double(Params[0]));
    end;
   varVariant:
    begin
-    Result:=Integer(Trunc(Int(Double(Params[0]))));
+    Result:=TruncNumber(Double(Params[0]));
+   end;
+  // An Int64 (a literal above 32 bits) is already an integer, and a Double
+  // does not hold all its digits: the same value, an Integer when it fits
+  varInt64:
+   begin
+    aint64:=Params[0];
+    if (aint64>=Low(Integer)) and (aint64<=High(Integer)) then
+     Result:=Integer(aint64)
+    else
+     Result:=aint64;
    end;
   else
    Raise TRpNamedException.Create(SRpEvalType,
@@ -2870,8 +2899,9 @@ begin
     -1,
     nil,
     0);
-  GetMem(buf, len);
-  ZeroMemory(buf, len);
+  // len counts characters (LCMapStringW in Unicode Delphi)
+  GetMem(buf, len*SizeOf(Char));
+  ZeroMemory(buf, len*SizeOf(Char));
   LCMapString($804, //LCID_CHINESE_SIMPLIFIED
     LCMAP_TRADITIONAL_CHINESE,
     Pchar(src),
@@ -2910,15 +2940,17 @@ begin
   exiT;
  end;
   len := LCMapString($804,
-    LCMAP_TRADITIONAL_CHINESE,
+    LCMAP_SIMPLIFIED_CHINESE,
     PChar(src),
     -1,
     nil,
     0);
-  GetMem(buf, len);
-  ZeroMemory(buf, len);
+  // len counts characters (LCMapStringW in Unicode Delphi)
+  GetMem(buf, len*SizeOf(Char));
+  ZeroMemory(buf, len*SizeOf(Char));
+  // To simplified Chinese: it used LCMAP_TRADITIONAL_CHINESE, as CHSTOCHT
   LCMapString($804, //LCID_CHINESE_SIMPLIFIED
-    LCMAP_TRADITIONAL_CHINESE,
+    LCMAP_SIMPLIFIED_CHINESE,
     PChar(src),
     -1,
     buf,
@@ -3005,16 +3037,17 @@ end;
 
 function TIdenLoadFile.GeTRpValue:TRpValue;
 var
- astring:string;
+ astring:AnsiString;
  memstream:TMemorystream;
 begin
  if Not VarIsString(Params[0]) then
    Raise TRpNamedException.Create(SRpEvalType,
          IdenName);
- astring:=String(Params[0]);
  memstream:=TMemoryStream.Create;
  try
-  memstream.LoadFromFile(astring);
+  memstream.LoadFromFile(String(Params[0]));
+  // The bytes of the file as ANSI characters: read into a (Unicode) string, as
+  // before, each pair of bytes became one character and the rest was garbage
   astring:='';
   if memstream.size>0 then
   begin
@@ -3025,7 +3058,7 @@ begin
  finally
   memstream.free;
  end;
- Result:=astring;
+ Result:=String(astring);
 end;
 
 

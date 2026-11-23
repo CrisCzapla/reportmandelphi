@@ -210,6 +210,7 @@ begin
     (SHGetFolderPathW(0, CSIDL_PERSONAL, 0, 0, buffer) = S_OK) then
     Result := string(WideString(PWideChar(@buffer[0])));
   if Result = '' then
+    // SysUtils: the one of Windows (after it in the uses) takes buffers
     Result := SysUtils.GetEnvironmentVariable('USERPROFILE');
 {$ELSE}
   Result := UnixDocumentsFolder;
